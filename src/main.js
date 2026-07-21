@@ -22,12 +22,12 @@ function calculateSimpleRevenue(purchase, _product) {
 function calculateBonusByProfit(index, total, seller) {
     // Проверка на единственного продавца
     if (total === 1) {
-        return 15;
+        return seller.profit * 0.15; // 15% от прибыли
     }
     
     // 1 место (индекс 0) — 15%
     if (index === 0) {
-        return 15;
+        return seller.profit * 0.15;
     }
     
     // Последнее место — 0%
@@ -37,11 +37,11 @@ function calculateBonusByProfit(index, total, seller) {
     
     // 2 и 3 места (индексы 1 и 2) — 10%
     if (index === 1 || index === 2) {
-        return 10;
+        return seller.profit * 0.10;
     }
     
     // Все остальные — 5%
-    return 5;
+    return seller.profit * 0.05;
 }
 
 /**
