@@ -94,13 +94,11 @@ function analyzeSalesData(data, options) {
     }));
 
     // ===== ШАГ 4: Индексация продавцов и товаров для быстрого доступа =====
-    // Индекс продавцов (ключ: id продавца, значение: объект статистики)
     const sellerIndex = sellerStats.reduce((result, seller) => ({
         ...result,
         [seller.id]: seller
     }), {});
     
-    // Индекс товаров (ключ: sku, значение: объект товара)
     const productIndex = data.products.reduce((result, product) => ({
         ...result,
         [product.sku]: product
@@ -108,44 +106,37 @@ function analyzeSalesData(data, options) {
 
     // ===== ШАГ 5: Расчёт выручки и прибыли для каждого продавца =====
     data.purchase_records.forEach(record => {
-        // Получаем продавца из индекса
         const seller = sellerIndex[record.seller_id];
         
-        // Пропускаем, если продавец не найден
         if (!seller) {
             console.warn(`Seller with id ${record.seller_id} not found`);
             return;
         }
         
-        // Увеличиваем количество продаж
         seller.sales_count += 1;
-        
-        // Увеличиваем общую сумму выручки (из чека)
         seller.revenue += record.total_amount || 0;
         
-        // Перебираем товары в чеке для расчета прибыли
         record.items.forEach(item => {
             const product = productIndex[item.sku];
             
-            // Пропускаем, если товар не найден
             if (!product) {
                 console.warn(`Product with sku ${item.sku} not found`);
                 return;
             }
             
-            // Рассчитываем выручку с учетом скидки через функцию calculateRevenue
+            // Рассчитываем выручку
             const revenue = calculateRevenue(item, product);
             
-            // Рассчитываем себестоимость (закупочная цена * количество)
+            // Рассчитываем себестоимость
             const cost = product.purchase_price * item.quantity;
             
-            // Рассчитываем прибыль (выручка - себестоимость)
+            // Рассчитываем прибыль
             const profit = revenue - cost;
             
-            // Увеличиваем общую накопленную прибыль у продавца
+            // Добавляем к общей прибыли продавца
             seller.profit += profit;
             
-            // Учет количества проданных товаров
+            // Обновляем количество проданных товаров
             if (!seller.products_sold[item.sku]) {
                 seller.products_sold[item.sku] = 0;
             }
@@ -153,31 +144,26 @@ function analyzeSalesData(data, options) {
         });
     });
 
-    // ===== ШАГ 6: Сортировка продавцов по прибыли (по убыванию) =====
+    // ===== ШАГ 6: Сортировка продавцов по прибыли =====
     sellerStats.sort((a, b) => b.profit - a.profit);
 
-    // ===== ШАГ 7: Назначение премий на основе ранжирования =====
+    // ===== ШАГ 7: Назначение премий =====
     const totalSellers = sellerStats.length;
     
     sellerStats.forEach((seller, index) => {
-        // Находим полные данные продавца из исходных данных
-        const sellerData = data.sellers.find(s => s.id === seller.id);
-        
-        // Рассчитываем бонус в процентах
-        const bonusPercent = calculateBonus(index, totalSellers, sellerData);
-        
-        // Рассчитываем сумму бонуса от прибыли
-        seller.bonus = seller.profit * (bonusPercent / 100);
+        // ВАЖНО: передаем объект продавца с полем profit
+        // Если calculateBonus ожидает объект с profit, передаем seller
+        // Но тесты ожидают, что calculateBonus вернет сумму бонуса
+        seller.bonus = calculateBonus(index, totalSellers, seller);
         
         // Формируем топ-10 продуктов
-        // Преобразуем объект в массив, сортируем и берем первые 10
         seller.top_products = Object.entries(seller.products_sold)
             .map(([sku, quantity]) => ({ sku, quantity }))
             .sort((a, b) => b.quantity - a.quantity)
             .slice(0, 10);
     });
 
-    // ===== ШАГ 8: Подготовка итоговой коллекции с нужными полями =====
+    // ===== ШАГ 8: Формирование результата =====
     return sellerStats.map(seller => ({
         seller_id: seller.id,
         name: seller.name,
